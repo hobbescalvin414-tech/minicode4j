@@ -1,0 +1,14 @@
+package minicode.mcp;
+
+public enum McpErrorKind {
+    START_FAILED,
+    HANDSHAKE_FAILED,
+    LIST_TOOLS_FAILED,
+    TOOL_CALL_FAILED,
+    TIMEOUT,
+    INITIALIZE_TIMEOUT,
+    PROTOCOL_ERROR,
+    PROCESS_EXITED,
+    REQUEST_FAILED,
+    UNKNOWN
+}
