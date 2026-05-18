@@ -9,11 +9,14 @@ cd E:\path\to\your-project
 minicode
 ```
 
+The default `minicode` entry starts the TS frontend. The frontend then launches the sibling Java backend jar with `--ui-stdio-run`.
+
 The default workspace is the current shell directory. Use `--cwd <path>` only when you want to override it.
 
 ## Requirements
 
-- JDK 21 on `PATH`
+- Node.js 20+ on `PATH`
+- JDK 21 available through `JAVA_HOME21`, then `JAVA_HOME`, then `java` on `PATH`
 - Provider configuration in environment variables or settings
 
 ## Provider
@@ -33,6 +36,7 @@ Do not paste real tokens into logs or issue reports.
 
 ```powershell
 minicode
+minicode --tty
 minicode --cwd E:\path\to\project
 minicode --resume <id>
 minicode --fork <id>
@@ -50,3 +54,5 @@ Add this release's `bin` directory to `PATH`, or run the launcher by full path:
 ```powershell
 E:\path\to\minicode\bin\minicode.cmd --version
 ```
+
+`minicode --tty` keeps the legacy Java TTY fallback. `--help`, `--version`, and `session ...` are also handled directly by the Java launcher path so they return quickly and do not start the TS frontend.

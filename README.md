@@ -26,16 +26,19 @@ MiniCode4j is built for local development workflows: reading files, searching co
 
 - Anthropic-compatible provider path
 - terminal-first coding agent workflow
+- default `minicode` launcher starts the TS terminal UI frontend
+- `minicode --tty` keeps the legacy Java TTY fallback
 - built-in tools: file reading, search, edit, write, command execution, `ask_user`, and `load_skill`
 - permission review before sensitive actions
 - append-only JSONL sessions with `list`, `rename`, `resume`, and `fork`
 - manual `/compact` and full autoCompact
-- Windows launcher and runnable fat jar
+- Windows launcher, TS UI runtime, and runnable fat jar
 
 ## Build
 
 Requires:
 
+- Node.js 20+
 - JDK 21
 - Maven 3.9+
 - PowerShell
@@ -62,7 +65,7 @@ target\dist\minicode\
 Where:
 
 - `target\minicode.jar` is a runnable fat jar.
-- `target\dist\minicode\` is the distribution directory containing `bin` and `lib`.
+- `target\dist\minicode\` is the distribution directory containing `bin`, `lib`, and `ts-cli` runtime files.
 
 After building, check the version and help output:
 
@@ -105,6 +108,14 @@ cd <your project directory>
 minicode
 ```
 
+The default `minicode` entry starts the TS frontend, which then launches the sibling Java backend jar with `--ui-stdio-run`.
+
+If you want the previous Java terminal path explicitly:
+
+```powershell
+minicode --tty
+```
+
 The default workspace is the current shell directory. You can also pass it explicitly:
 
 ```powershell
@@ -124,7 +135,9 @@ Quick smoke test:
 New-Item -ItemType Directory -Force .\manual-test-workspace | Out-Null
 cd .\manual-test-workspace
 <MiniCode4j source directory>\target\dist\minicode\bin\minicode.cmd --version
-<MiniCode4j source directory>\target\dist\minicode\bin\minicode.cmd session list
+<MiniCode4j source directory>\target\dist\minicode\bin\minicode.cmd --help
+<MiniCode4j source directory>\target\dist\minicode\bin\minicode.cmd
+<MiniCode4j source directory>\target\dist\minicode\bin\minicode.cmd --tty
 ```
 
 ## Provider
@@ -144,6 +157,7 @@ Do not commit or print real tokens.
 
 ```powershell
 minicode
+minicode --tty
 minicode --cwd <path>
 minicode --resume <id>
 minicode --fork <id>
@@ -155,3 +169,5 @@ minicode --help
 ```
 
 Sessions are scoped by workspace cwd. To resume a session, run from the same project directory or pass the same `--cwd`.
+
+The packaged distribution does not bundle Node.js and does not include `node_modules`. It expects a working local `node` command.

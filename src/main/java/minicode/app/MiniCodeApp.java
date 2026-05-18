@@ -3,6 +3,9 @@ package minicode.app;
 import minicode.config.RuntimeConfig;
 import minicode.config.RuntimeConfigException;
 import minicode.config.RuntimeConfigLoader;
+import minicode.app.ui.UiStdioMockBackend;
+import minicode.app.ui.UiStdioRealBackend;
+import minicode.app.ui.UiStdioRunTurnBackend;
 import minicode.core.event.AgentEventSink;
 import minicode.permissions.api.PermissionPromptHandler;
 import minicode.session.service.SessionService;
@@ -90,6 +93,29 @@ public final class MiniCodeApp {
         }
         if (appArgs.version()) {
             new PrintWriter(output, true, StandardCharsets.UTF_8).println("minicode " + VERSION);
+            return 0;
+        }
+        if (appArgs.uiStdioMock()) {
+            new UiStdioMockBackend().run(actualCwd, output);
+            return 0;
+        }
+        if (appArgs.uiStdioMockRun()) {
+            new UiStdioRunTurnBackend().run(home, actualCwd, input, output,
+                    effectiveMaxSteps(java.util.Optional.ofNullable(appArgs.maxStepsOverride()), java.util.Optional.empty()));
+            return 0;
+        }
+        if (appArgs.uiStdioRun()) {
+            RuntimeConfig runtimeConfig;
+            try {
+                runtimeConfig = RuntimeConfigLoader.load(new RuntimeConfigLoader.Input(home, actualCwd, env));
+            } catch (RuntimeConfigException exception) {
+                err.println("Configuration error: " + exception.getMessage());
+                err.println("Configure MINICODE_PROVIDER, ANTHROPIC_MODEL or MINICODE_MODEL, and ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY.");
+                err.println("Mock mode is only used when MINICODE_PROVIDER=mock is explicitly set.");
+                return 2;
+            }
+            UiStdioRealBackend.real(runtimeConfig).run(home, actualCwd, input, output,
+                    effectiveMaxSteps(java.util.Optional.ofNullable(appArgs.maxStepsOverride()), java.util.Optional.of(runtimeConfig)));
             return 0;
         }
         if (appArgs.sessionCommand()) {
@@ -253,20 +279,30 @@ public final class MiniCodeApp {
         return """
                 Usage:
                   minicode
+                  minicode --tty
                   minicode --cwd <path>
                   minicode --resume <id>
                   minicode --fork <id>
                   minicode session list
                   minicode session rename <id> <title>
                   minicode --max-steps <n>
+                  minicode --ui-stdio-mock
+                  minicode --ui-stdio-mock-run
+                  minicode --ui-stdio-run
                   minicode --version
                   minicode --help
 
                 Options:
+                  --tty              Use the legacy Java TTY frontend when launched from packaged scripts.
                   --cwd <path>       Use an explicit workspace directory.
                   --resume <id>      Resume a session for the current workspace.
                   --fork <id>        Fork a session for the current workspace.
                   --max-steps <n>    Limit one agent turn to 1..100 model/tool steps.
+                  --ui-stdio-mock    Print fixed experimental UI JSONL events and exit.
+                  --ui-stdio-mock-run
+                                      Run experimental UI JSONL bridge with mock provider.
+                  --ui-stdio-run
+                                      Run experimental UI JSONL bridge with real runtime config.
                   --version          Print version and exit.
                   --help             Print this help and exit.
                 """;
@@ -385,7 +421,8 @@ public final class MiniCodeApp {
     }
 
     private record AppArgs(String resumeSessionId, String forkSessionId, Path cwdOverride,
-                           boolean help, boolean version, boolean snake,
+                           boolean help, boolean version, boolean snake, boolean uiStdioMock, boolean uiStdioMockRun,
+                           boolean uiStdioRun,
                            Integer maxStepsOverride, List<String> remaining) {
         private static final int DEFAULT_MAX_STEPS = MiniTui.DEFAULT_MAX_STEPS;
         private static final int MAX_MAX_STEPS = 100;
@@ -395,6 +432,9 @@ public final class MiniCodeApp {
             boolean help = takeFlag(remaining, "--help") || takeFlag(remaining, "-h");
             boolean version = takeFlag(remaining, "--version");
             boolean snake = takeFlag(remaining, "--snake");
+            boolean uiStdioMock = takeFlag(remaining, "--ui-stdio-mock");
+            boolean uiStdioMockRun = takeFlag(remaining, "--ui-stdio-mock-run");
+            boolean uiStdioRun = takeFlag(remaining, "--ui-stdio-run");
             String cwd = takeOption(remaining, "--cwd");
             String maxSteps = takeOption(remaining, "--max-steps");
             String resume = takeOption(remaining, "--resume");
@@ -402,7 +442,8 @@ public final class MiniCodeApp {
             if (resume != null && fork != null) {
                 throw new IllegalArgumentException("Use either --resume or --fork, not both.");
             }
-            return new AppArgs(resume, fork, cwd == null ? null : Path.of(cwd), help, version, snake,
+            return new AppArgs(resume, fork, cwd == null ? null : Path.of(cwd), help, version, snake, uiStdioMock,
+                    uiStdioMockRun, uiStdioRun,
                     maxSteps == null ? null : parseMaxSteps(maxSteps),
                     List.copyOf(remaining));
         }

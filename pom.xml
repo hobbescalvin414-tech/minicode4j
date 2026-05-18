@@ -14,6 +14,7 @@
         <junit.jupiter.version>5.10.3</junit.jupiter.version>
         <jackson.version>2.17.2</jackson.version>
         <jline.version>3.26.3</jline.version>
+        <npm.command>npm.cmd</npm.command>
     </properties>
 
     <dependencies>
@@ -74,6 +75,42 @@
                 </executions>
             </plugin>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>npm-ci-ts-cli</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <workingDirectory>${project.basedir}/frontend/ts-cli</workingDirectory>
+                            <executable>${npm.command}</executable>
+                            <arguments>
+                                <argument>ci</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-build-ts-cli</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <workingDirectory>${project.basedir}/frontend/ts-cli</workingDirectory>
+                            <executable>${npm.command}</executable>
+                            <arguments>
+                                <argument>run</argument>
+                                <argument>build</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>maven-resources-plugin</artifactId>
                 <version>3.3.1</version>
                 <executions>
@@ -88,6 +125,32 @@
                             <resources>
                                 <resource>
                                     <directory>${project.basedir}/dist/minicode</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>copy-ts-cli-runtime</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/dist/minicode/ts-cli</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/frontend/ts-cli</directory>
+                                    <includes>
+                                        <include>package.json</include>
+                                    </includes>
+                                    <filtering>false</filtering>
+                                </resource>
+                                <resource>
+                                    <directory>${project.basedir}/frontend/ts-cli/dist</directory>
+                                    <includes>
+                                        <include>src/**</include>
+                                    </includes>
                                     <filtering>false</filtering>
                                 </resource>
                             </resources>

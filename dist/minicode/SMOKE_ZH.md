@@ -2,6 +2,7 @@
 
 ## 1. 前置条件
 
+- Node.js 20+ 已安装，并且 `node -v` 可用。
 - JDK 21 已安装，并且 `java -version` 显示 21。
 - 发布目录结构包含：
 
@@ -12,6 +13,11 @@ minicode\
     minicode.ps1
   lib\
     minicode.jar
+  ts-cli\
+    package.json
+    src\
+      main.js
+      ...
   README.md
   SMOKE_ZH.md
 ```
@@ -36,7 +42,7 @@ $env:ANTHROPIC_AUTH_TOKEN="<token>"
 .\bin\minicode.cmd --help
 ```
 
-这两个命令不应启动 provider、不应启动 TUI、不应创建 session。
+这两个命令不应启动 provider、不应启动 TS frontend、不应创建 session。
 
 ## 3. 加入 PATH
 
@@ -62,7 +68,7 @@ cd E:\Minicode-Java\manual-test-workspace
 minicode
 ```
 
-预期：MiniCode 默认工作区是当前 shell 目录 `E:\Minicode-Java\manual-test-workspace`。
+预期：默认 `minicode` 启动 TS frontend，TS frontend 再自动启动同一发布目录下的 Java backend jar；MiniCode 默认工作区是当前 shell 目录 `E:\Minicode-Java\manual-test-workspace`。
 
 可让模型执行一个最小写文件 smoke：
 
@@ -91,9 +97,20 @@ cd E:\Minicode-Java\MiniCode-Java
 minicode --cwd E:\Minicode-Java\manual-test-workspace
 ```
 
-预期：runtime config、system prompt cwd、session、permission、tools 都使用 `--cwd` 指定的目录。
+预期：launcher、TS frontend、Java backend 整条链路都保持 `--cwd` 指定的目录作为 workspace；runtime config、system prompt cwd、session、permission、tools 都使用该目录。
 
-## 6. session
+## 6. --tty fallback
+
+显式走旧 Java TTY：
+
+```powershell
+cd E:\Minicode-Java\manual-test-workspace
+minicode --tty
+```
+
+预期：不经过 TS frontend，直接进入旧 Java TTY fallback；workspace 仍然是当前 shell 目录。
+
+## 7. session
 
 查看当前工作区 session：
 
@@ -116,7 +133,7 @@ Session <id> belongs to a different cwd: <path>
 
 修正方式是在 session 所属目录运行，或显式带同一个 `--cwd`。
 
-## 7. 打包产物 smoke
+## 8. 打包产物 smoke
 
 在源码目录执行：
 
@@ -133,4 +150,6 @@ java -jar target\minicode.jar --version
 java -jar target\minicode.jar --help
 target\dist\minicode\bin\minicode.cmd --version
 target\dist\minicode\bin\minicode.cmd --help
+target\dist\minicode\bin\minicode.cmd
+target\dist\minicode\bin\minicode.cmd --tty
 ```

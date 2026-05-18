@@ -65,12 +65,14 @@ class MiniCodeAppTest {
         assertEquals(0, exitCode, error.toString(StandardCharsets.UTF_8));
         assertTrue(text.contains("Usage:"), text);
         assertTrue(text.contains("minicode"), text);
+        assertTrue(text.contains("minicode --tty"), text);
         assertTrue(text.contains("minicode --cwd <path>"), text);
         assertTrue(text.contains("minicode --resume <id>"), text);
         assertTrue(text.contains("minicode --fork <id>"), text);
         assertTrue(text.contains("minicode session list"), text);
         assertTrue(text.contains("minicode session rename <id> <title>"), text);
         assertTrue(text.contains("minicode --max-steps <n>"), text);
+        assertTrue(text.contains("minicode --ui-stdio-run"), text);
         assertTrue(text.contains("minicode --version"), text);
         assertTrue(text.contains("minicode --help"), text);
         assertFalse(text.contains("--snake"), text);
@@ -96,6 +98,79 @@ class MiniCodeAppTest {
         assertEquals(0, exitCode, error.toString(StandardCharsets.UTF_8));
         assertEquals("minicode 0.1.0-SNAPSHOT", text);
         assertFalse(error.toString(StandardCharsets.UTF_8).contains("Configuration error:"), error.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void uiStdioMockPrintsJsonlWithoutProviderConfigurationOrServices() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream error = new ByteArrayOutputStream();
+        Path workspace = tempDir.resolve("workspace").toAbsolutePath().normalize();
+        Files.createDirectories(workspace);
+
+        int exitCode = MiniCodeApp.run(
+                new String[]{"--ui-stdio-mock", "--cwd", workspace.toString()},
+                tempDir.resolve("home"),
+                tempDir.resolve("process-cwd"),
+                new ByteArrayInputStream(new byte[0]),
+                output,
+                error,
+                Map.of("MINICODE_PROVIDER", "anthropic-compatible")
+        );
+
+        String[] lines = output.toString(StandardCharsets.UTF_8).strip().split("\\R");
+        assertEquals(0, exitCode, error.toString(StandardCharsets.UTF_8));
+        assertTrue(error.toString(StandardCharsets.UTF_8).isBlank(), error.toString(StandardCharsets.UTF_8));
+        assertTrue(lines.length >= 8, output.toString(StandardCharsets.UTF_8));
+        assertEquals("ready", new com.fasterxml.jackson.databind.ObjectMapper().readTree(lines[0]).get("type").asText());
+        assertTrue(output.toString(StandardCharsets.UTF_8).contains("\"type\":\"permission_request\""));
+        assertTrue(output.toString(StandardCharsets.UTF_8).contains("\"type\":\"await_user\""));
+        assertTrue(output.toString(StandardCharsets.UTF_8).contains("\"type\":\"turn_stop\""));
+        assertTrue(output.toString(StandardCharsets.UTF_8).contains(workspace.toString().replace("\\", "\\\\")));
+    }
+
+    @Test
+    void uiStdioMockRunDoesNotLoadRealProviderConfig() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream error = new ByteArrayOutputStream();
+        Path workspace = tempDir.resolve("workspace").toAbsolutePath().normalize();
+        Files.createDirectories(workspace);
+
+        int exitCode = MiniCodeApp.run(
+                new String[]{"--ui-stdio-mock-run", "--cwd", workspace.toString()},
+                tempDir.resolve("home"),
+                tempDir.resolve("process-cwd"),
+                new ByteArrayInputStream("{\"type\":\"shutdown\"}\n".getBytes(StandardCharsets.UTF_8)),
+                output,
+                error,
+                Map.of("MINICODE_PROVIDER", "anthropic-compatible")
+        );
+
+        assertEquals(0, exitCode, error.toString(StandardCharsets.UTF_8));
+        assertFalse(error.toString(StandardCharsets.UTF_8).contains("Configuration error:"), error.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void uiStdioRunIsExplicitRealProviderEntryAndLoadsRuntimeConfig() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream error = new ByteArrayOutputStream();
+        Path workspace = tempDir.resolve("workspace").toAbsolutePath().normalize();
+        Files.createDirectories(workspace);
+
+        int exitCode = MiniCodeApp.run(
+                new String[]{"--ui-stdio-run", "--cwd", workspace.toString()},
+                tempDir.resolve("home"),
+                tempDir.resolve("process-cwd"),
+                new ByteArrayInputStream("{\"type\":\"shutdown\"}\n".getBytes(StandardCharsets.UTF_8)),
+                output,
+                error,
+                Map.of("MINICODE_PROVIDER", "anthropic-compatible")
+        );
+
+        String errorText = error.toString(StandardCharsets.UTF_8);
+        assertEquals(2, exitCode);
+        assertTrue(errorText.contains("Configuration error:"), errorText);
+        assertTrue(errorText.contains("No model configured."), errorText);
+        assertFalse(errorText.contains("ANTHROPIC_AUTH_TOKEN="), errorText);
     }
 
     @Test

@@ -26,16 +26,19 @@ MiniCode4j 面向本地开发工作流：读文件、搜代码、执行命令、
 
 - Anthropic-compatible provider 路径
 - terminal-first coding agent 工作流
+- 默认 `minicode` 启动 TS terminal UI frontend
+- `minicode --tty` 保留旧 Java TTY fallback
 - 内置工具：文件读取、搜索、编辑、写入、命令执行、`ask_user`、`load_skill`
 - 敏感动作执行前进行权限审查
 - append-only JSONL session，支持 `list`、`rename`、`resume`、`fork`
 - manual `/compact` 与 full autoCompact
-- Windows launcher 与可运行 fat jar
+- Windows launcher、TS UI 运行时与可运行 fat jar
 
 ## 构建
 
 需要：
 
+- Node.js 20+
 - JDK 21
 - Maven 3.9+
 - PowerShell
@@ -62,7 +65,7 @@ target\dist\minicode\
 其中：
 
 - `target\minicode.jar` 是可直接运行的 fat jar。
-- `target\dist\minicode\` 是发布目录，里面包含 `bin` 和 `lib`。
+- `target\dist\minicode\` 是发布目录，里面包含 `bin`、`lib` 和 `ts-cli` 运行时文件。
 
 构建完成后可以先检查版本和帮助：
 
@@ -105,6 +108,14 @@ cd <你的项目目录>
 minicode
 ```
 
+默认 `minicode` 会先启动 TS frontend，再由 TS frontend 自动启动同发布目录下的 Java backend jar，并传入 `--ui-stdio-run`。
+
+如果你想显式走旧 Java TTY 路径：
+
+```powershell
+minicode --tty
+```
+
 默认 workspace 就是当前 shell 目录。也可以显式指定：
 
 ```powershell
@@ -124,7 +135,9 @@ cd <你的项目目录>
 New-Item -ItemType Directory -Force .\manual-test-workspace | Out-Null
 cd .\manual-test-workspace
 <MiniCode4j 源码目录>\target\dist\minicode\bin\minicode.cmd --version
-<MiniCode4j 源码目录>\target\dist\minicode\bin\minicode.cmd session list
+<MiniCode4j 源码目录>\target\dist\minicode\bin\minicode.cmd --help
+<MiniCode4j 源码目录>\target\dist\minicode\bin\minicode.cmd
+<MiniCode4j 源码目录>\target\dist\minicode\bin\minicode.cmd --tty
 ```
 
 ## Provider
@@ -144,6 +157,7 @@ $env:ANTHROPIC_AUTH_TOKEN="<token>"
 
 ```powershell
 minicode
+minicode --tty
 minicode --cwd <path>
 minicode --resume <id>
 minicode --fork <id>
@@ -155,3 +169,5 @@ minicode --help
 ```
 
 session 按 workspace cwd 隔离。恢复 session 时，请在同一个项目目录运行，或传入相同的 `--cwd`。
+
+当前发布目录不会 bundled Node.js，也不会包含 `node_modules`；默认 TS UI 启动依赖本机可用的 `node` 命令。JDK 21 仍然是必须项，因为 TS frontend 会启动同目录下的 Java backend。
