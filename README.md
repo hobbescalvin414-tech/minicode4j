@@ -66,6 +66,7 @@ Where:
 
 - `target\minicode.jar` is a runnable fat jar.
 - `target\dist\minicode\` is the distribution directory containing `bin`, `lib`, and `ts-cli` runtime files.
+- `dist\minicode\` is also kept as a checked-in runnable distribution snapshot for the current source version.
 
 After building, check the version and help output:
 
@@ -96,6 +97,12 @@ mvn package
 ## Run
 
 Add the distribution `bin` directory to `PATH`:
+
+```powershell
+$env:PATH="<MiniCode4j source directory>\dist\minicode\bin;$env:PATH"
+```
+
+After running `mvn package`, you can alternatively use the freshly built distribution:
 
 ```powershell
 $env:PATH="<MiniCode4j source directory>\target\dist\minicode\bin;$env:PATH"
@@ -129,6 +136,13 @@ cd <your project directory>
 <MiniCode4j source directory>\target\dist\minicode\bin\minicode.cmd
 ```
 
+For the checked-in runnable distribution snapshot, use:
+
+```powershell
+cd <your project directory>
+<MiniCode4j source directory>\dist\minicode\bin\minicode.cmd
+```
+
 Quick smoke test:
 
 ```powershell
@@ -138,6 +152,8 @@ cd .\manual-test-workspace
 <MiniCode4j source directory>\target\dist\minicode\bin\minicode.cmd --help
 <MiniCode4j source directory>\target\dist\minicode\bin\minicode.cmd
 <MiniCode4j source directory>\target\dist\minicode\bin\minicode.cmd --tty
+<MiniCode4j source directory>\dist\minicode\bin\minicode.cmd --version
+<MiniCode4j source directory>\dist\minicode\bin\minicode.cmd --help
 ```
 
 ## Provider

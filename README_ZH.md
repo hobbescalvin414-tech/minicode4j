@@ -66,6 +66,7 @@ target\dist\minicode\
 
 - `target\minicode.jar` 是可直接运行的 fat jar。
 - `target\dist\minicode\` 是发布目录，里面包含 `bin`、`lib` 和 `ts-cli` 运行时文件。
+- `dist\minicode\` 也作为当前源码版本的可运行发布快照提交在仓库中。
 
 构建完成后可以先检查版本和帮助：
 
@@ -96,6 +97,12 @@ mvn package
 ## 运行
 
 把发布目录的 `bin` 加入 `PATH`：
+
+```powershell
+$env:PATH="<MiniCode4j 源码目录>\dist\minicode\bin;$env:PATH"
+```
+
+如果你刚运行过 `mvn package`，也可以使用最新构建出来的发布目录：
 
 ```powershell
 $env:PATH="<MiniCode4j 源码目录>\target\dist\minicode\bin;$env:PATH"
@@ -129,6 +136,13 @@ cd <你的项目目录>
 <MiniCode4j 源码目录>\target\dist\minicode\bin\minicode.cmd
 ```
 
+如果使用仓库内提交的可运行发布快照：
+
+```powershell
+cd <你的项目目录>
+<MiniCode4j 源码目录>\dist\minicode\bin\minicode.cmd
+```
+
 快速 smoke：
 
 ```powershell
@@ -138,6 +152,8 @@ cd .\manual-test-workspace
 <MiniCode4j 源码目录>\target\dist\minicode\bin\minicode.cmd --help
 <MiniCode4j 源码目录>\target\dist\minicode\bin\minicode.cmd
 <MiniCode4j 源码目录>\target\dist\minicode\bin\minicode.cmd --tty
+<MiniCode4j 源码目录>\dist\minicode\bin\minicode.cmd --version
+<MiniCode4j 源码目录>\dist\minicode\bin\minicode.cmd --help
 ```
 
 ## Provider
