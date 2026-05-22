@@ -18,7 +18,7 @@
   A lightweight, local-first, terminal-first coding agent. Java edition of MiniCode.
 </p>
 
-[简体中文](./README_ZH.md) | [Improvement ideas (Chinese)](./IMPROVEMENTS_ZH.md)
+[简体中文](./README_ZH.md) | [Learning manual (Chinese)](./MiniCode4j学习手册.md) | [Improvement ideas (Chinese)](./IMPROVEMENTS_ZH.md)
 
 MiniCode4j is built for local development workflows: reading files, searching code, running commands, reviewing edits, keeping resumable sessions, and staying usable in long conversations through context compacting. It currently provides the minimum feature set of a coding agent. Many parts are still rough, but it runs.
 

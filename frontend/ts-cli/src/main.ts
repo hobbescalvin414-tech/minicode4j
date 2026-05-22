@@ -18,6 +18,7 @@ import {
   liveRegionClearLineCount,
   liveRegionSubmittedClearLineCount,
   resetReadlineBuffer,
+  shouldCloseForBackendEvent,
   shouldRenderDetailsAt,
   shouldRefreshLiveRegionAfterReadlineKey,
   shouldSendCommandForDetails
@@ -200,14 +201,19 @@ async function readInteractiveCommands(
   disableReadlineHistory(rl);
   emitKeypressEvents(input, rl);
   const live = new LiveRegionController(rl, getInputState, getDetailsState);
+  let interrupted = false;
   attachBackendRenderer(backend, (event) => {
     options.setDetailsState(reduceSessionDetailsState(getDetailsState(), event));
     options.setInputState(reduceInputStateForEvent(getInputState(), event));
+    if (shouldCloseForBackendEvent(event)) {
+      interrupted = true;
+      terminateBackendProcess(backend);
+      rl.close();
+    }
   }, () => options.shouldRenderBackendOutput?.() ?? true, (text) => {
     live.writeTranscript(text);
   });
   let lastDetailsRenderedAtMs = 0;
-  let interrupted = false;
   const onSigint = createSigintShutdownHandler({
     sendCommand: (command) => sendCommand(backend, command),
     suppressBackendOutput: options.suppressBackendOutput,

@@ -5,7 +5,7 @@ import { clearLine, cursorTo, emitKeypressEvents, moveCursor } from "node:readli
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output, stderr } from "node:process";
 import { defaultDistRoot, defaultRepoRoot, startJavaMockRunTurnBackend, startJavaRealBackend } from "./java-backend.js";
-import { controlKeyActionForKey, createSigintShutdownHandler, disableReadlineHistory, liveRegionClearLineCount, liveRegionSubmittedClearLineCount, resetReadlineBuffer, shouldRenderDetailsAt, shouldRefreshLiveRegionAfterReadlineKey, shouldSendCommandForDetails } from "./interactive-controls.js";
+import { controlKeyActionForKey, createSigintShutdownHandler, disableReadlineHistory, liveRegionClearLineCount, liveRegionSubmittedClearLineCount, resetReadlineBuffer, shouldCloseForBackendEvent, shouldRenderDetailsAt, shouldRefreshLiveRegionAfterReadlineKey, shouldSendCommandForDetails } from "./interactive-controls.js";
 import { commandForLatestInputLine, initialInputState, permissionCancelCommand, reduceInputStateForEvent, reduceInputStateForEmptySubmit, reduceInputStateForPermissionSelection, reduceInputStateForSubmittedCommand } from "./input-state.js";
 import { parseJsonlEvents, toCommandLine } from "./protocol.js";
 import { StreamingRenderer, renderDetailsPanel, renderEvents, renderLiveRegionLayout, renderSubmittedCommandLine } from "./renderer.js";
@@ -142,14 +142,19 @@ async function readInteractiveCommands(options) {
     disableReadlineHistory(rl);
     emitKeypressEvents(input, rl);
     const live = new LiveRegionController(rl, getInputState, getDetailsState);
+    let interrupted = false;
     attachBackendRenderer(backend, (event) => {
         options.setDetailsState(reduceSessionDetailsState(getDetailsState(), event));
         options.setInputState(reduceInputStateForEvent(getInputState(), event));
+        if (shouldCloseForBackendEvent(event)) {
+            interrupted = true;
+            terminateBackendProcess(backend);
+            rl.close();
+        }
     }, () => options.shouldRenderBackendOutput?.() ?? true, (text) => {
         live.writeTranscript(text);
     });
     let lastDetailsRenderedAtMs = 0;
-    let interrupted = false;
     const onSigint = createSigintShutdownHandler({
         sendCommand: (command) => sendCommand(backend, command),
         suppressBackendOutput: options.suppressBackendOutput,

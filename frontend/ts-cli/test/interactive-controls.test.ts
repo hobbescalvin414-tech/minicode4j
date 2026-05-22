@@ -7,6 +7,7 @@ import {
   liveRegionClearLineCount,
   renderPanelDuringReadlineQuestion,
   resetReadlineBuffer,
+  shouldCloseForBackendEvent,
   shouldRenderDetailsAt,
   shouldRefreshLiveRegionAfterReadlineKey,
   shouldSendCommandForDetails,
@@ -37,6 +38,25 @@ test("running backend guard blocks duplicate user_submit but keeps responses flo
   }, running), true);
   assert.equal(shouldSendCommandForDetails({ type: "ask_user_answer", toolUseId: "ask-1", text: "README.md" }, running), true);
   assert.equal(shouldSendCommandForDetails({ type: "shutdown" }, running), true);
+});
+
+test("fatal backend errors close the interactive session", () => {
+  assert.equal(shouldCloseForBackendEvent({
+    type: "error",
+    message: "Session belongs to a different cwd",
+    recoverable: false
+  }), true);
+  assert.equal(shouldCloseForBackendEvent({
+    type: "error",
+    message: "Backend is busy",
+    recoverable: true
+  }), false);
+  assert.equal(shouldCloseForBackendEvent({
+    type: "ready",
+    sessionId: "session-1",
+    cwd: "E:\\work",
+    model: "mock"
+  }), false);
 });
 
 test("Ctrl+T duplicate guard suppresses immediate repeated keypress events", () => {

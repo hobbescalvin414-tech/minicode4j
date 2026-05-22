@@ -7,6 +7,9 @@ export function controlKeyActionForKey(key) {
 export function shouldSendCommandForDetails(command, state) {
     return !(command.type === "user_submit" && state.backendStatus === "Running");
 }
+export function shouldCloseForBackendEvent(event) {
+    return event.type === "error" && !event.recoverable;
+}
 export function renderPanelDuringReadlineQuestion(options) {
     return `\r\x1b[2K${options.panel}\n${options.prompt}${options.line}`;
 }

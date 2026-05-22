@@ -1,4 +1,5 @@
 import type { UiCommand } from "./protocol.js";
+import type { UiEvent } from "./protocol.js";
 import type { SessionDetailsState } from "./session-details.js";
 
 export type ControlKey = {
@@ -19,6 +20,10 @@ export function controlKeyActionForKey(key: ControlKey | undefined): ControlKeyA
 
 export function shouldSendCommandForDetails(command: UiCommand, state: Pick<SessionDetailsState, "backendStatus">): boolean {
   return !(command.type === "user_submit" && state.backendStatus === "Running");
+}
+
+export function shouldCloseForBackendEvent(event: UiEvent): boolean {
+  return event.type === "error" && !event.recoverable;
 }
 
 export function renderPanelDuringReadlineQuestion(options: {

@@ -4,7 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import minicode.config.ProviderKind;
 import minicode.config.RuntimeConfig;
+import minicode.core.message.UserMessage;
+import minicode.core.step.AssistantKind;
+import minicode.core.step.AssistantStep;
 import minicode.model.MockModelAdapter;
+import minicode.session.store.SessionStore;
 import minicode.tools.api.ToolCall;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -83,6 +87,114 @@ class UiStdioRealBackendTest {
     }
 
     @Test
+    void userSubmitPersistsUserMessageAndResumeProjectsUserHistory() throws Exception {
+        Path home = tempDir.resolve("home").toAbsolutePath().normalize();
+        Path workspace = tempDir.resolve("workspace").toAbsolutePath().normalize();
+        Files.createDirectories(workspace);
+        String sessionId = "ui-real-session";
+        ByteArrayOutputStream firstOutput = new ByteArrayOutputStream();
+        String firstInput = String.join("\n",
+                jsonObject("type", "init", "cwd", workspace.toString(), "home", home.toString(),
+                        "sessionId", sessionId, "maxSteps", 4),
+                jsonObject("type", "user_submit", "text", "persist me"),
+                jsonObject("type", "shutdown")) + "\n";
+
+        UiStdioRealBackend.real(runtimeConfig("mock-model")).run(home, workspace,
+                new ByteArrayInputStream(firstInput.getBytes(StandardCharsets.UTF_8)), firstOutput, 4);
+
+        SessionStore store = new SessionStore(home.resolve("sessions"));
+        assertTrue(store.readAll(sessionId, workspace.toString()).stream()
+                        .anyMatch(event -> event.message().orElse(null) instanceof UserMessage user
+                                && "persist me".equals(user.content())),
+                firstOutput.toString(StandardCharsets.UTF_8));
+
+        ByteArrayOutputStream resumeOutput = new ByteArrayOutputStream();
+        String resumeInput = String.join("\n",
+                jsonObject("type", "init", "cwd", workspace.toString(), "home", home.toString(),
+                        "resumeSessionId", sessionId, "maxSteps", 4),
+                jsonObject("type", "shutdown")) + "\n";
+
+        UiStdioRealBackend.real(runtimeConfig("mock-model")).run(home, workspace,
+                new ByteArrayInputStream(resumeInput.getBytes(StandardCharsets.UTF_8)), resumeOutput, 4);
+
+        List<JsonNode> resumeEvents = resumeOutput.toString(StandardCharsets.UTF_8).lines()
+                .map(UiStdioRealBackendTest::parseJson)
+                .toList();
+        assertTrue(resumeEvents.stream().anyMatch(event -> isHistoryItem(event, "user", "persist me")),
+                resumeOutput.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void resumeHistoryDoesNotProjectInternalProgressContinuationAsUserHistory() throws Exception {
+        Path home = tempDir.resolve("home").toAbsolutePath().normalize();
+        Path workspace = tempDir.resolve("workspace").toAbsolutePath().normalize();
+        Files.createDirectories(workspace);
+        String sessionId = "ui-real-progress-session";
+        ByteArrayOutputStream firstOutput = new ByteArrayOutputStream();
+        String firstInput = String.join("\n",
+                jsonObject("type", "init", "cwd", workspace.toString(), "home", home.toString(),
+                        "sessionId", sessionId, "maxSteps", 4),
+                jsonObject("type", "user_submit", "text", "real user request"),
+                jsonObject("type", "shutdown")) + "\n";
+
+        UiStdioRealBackend.real(runtimeConfig("mock-model"), new MockModelAdapter(List.of(
+                new AssistantStep("working", AssistantKind.PROGRESS),
+                new AssistantStep("done", AssistantKind.FINAL)
+        ))).run(home, workspace, new ByteArrayInputStream(firstInput.getBytes(StandardCharsets.UTF_8)),
+                firstOutput, 4);
+
+        ByteArrayOutputStream resumeOutput = new ByteArrayOutputStream();
+        String resumeInput = String.join("\n",
+                jsonObject("type", "init", "cwd", workspace.toString(), "home", home.toString(),
+                        "resumeSessionId", sessionId, "maxSteps", 4),
+                jsonObject("type", "shutdown")) + "\n";
+
+        UiStdioRealBackend.real(runtimeConfig("mock-model")).run(home, workspace,
+                new ByteArrayInputStream(resumeInput.getBytes(StandardCharsets.UTF_8)), resumeOutput, 4);
+
+        List<JsonNode> resumeEvents = resumeOutput.toString(StandardCharsets.UTF_8).lines()
+                .map(UiStdioRealBackendTest::parseJson)
+                .toList();
+        assertTrue(resumeEvents.stream().anyMatch(event -> isHistoryItem(event, "user", "real user request")),
+                resumeOutput.toString(StandardCharsets.UTF_8));
+        assertFalse(resumeEvents.stream().anyMatch(event -> isHistoryItemContaining(event, "user",
+                        "Continue immediately from your <progress>")),
+                resumeOutput.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void resumeSessionFromDifferentCwdReportsErrorInsteadOfStartingEmptySession() throws Exception {
+        Path home = tempDir.resolve("home").toAbsolutePath().normalize();
+        Path originalWorkspace = tempDir.resolve("original-workspace").toAbsolutePath().normalize();
+        Path currentWorkspace = tempDir.resolve("current-workspace").toAbsolutePath().normalize();
+        Files.createDirectories(originalWorkspace);
+        Files.createDirectories(currentWorkspace);
+        String sessionId = "ui-real-other-cwd-session";
+        new SessionStore(home.resolve("sessions"))
+                .append(new minicode.session.factory.SessionEventFactory(sessionId, originalWorkspace.toString())
+                        .message(new UserMessage("from original cwd")));
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        String input = String.join("\n",
+                jsonObject("type", "init", "cwd", currentWorkspace.toString(), "home", home.toString(),
+                        "resumeSessionId", sessionId, "maxSteps", 4),
+                jsonObject("type", "user_submit", "text", "must not start a new session"),
+                jsonObject("type", "shutdown")) + "\n";
+
+        UiStdioRealBackend.real(runtimeConfig("mock-model")).run(home, currentWorkspace,
+                new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)), output, 4);
+
+        List<JsonNode> events = output.toString(StandardCharsets.UTF_8).lines()
+                .map(UiStdioRealBackendTest::parseJson)
+                .toList();
+        assertFalse(events.stream().anyMatch(event -> isType(event, "ready")), output.toString(StandardCharsets.UTF_8));
+        assertFalse(events.stream().anyMatch(event -> isAssistantMessage(event, "mock final")),
+                output.toString(StandardCharsets.UTF_8));
+        assertTrue(events.stream().anyMatch(event -> isFatalErrorContaining(event,
+                        "belongs to a different cwd")),
+                output.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
     void askUserAnswerAcceptedImmediatelyAfterAwaitUserEvent() throws Exception {
         Path home = tempDir.resolve("home").toAbsolutePath().normalize();
         Path workspace = tempDir.resolve("workspace").toAbsolutePath().normalize();
@@ -150,6 +262,24 @@ class UiStdioRealBackendTest {
 
     private static boolean isTurnStop(JsonNode event, String reason) {
         return isType(event, "turn_stop") && reason.equals(event.get("reason").asText());
+    }
+
+    private static boolean isHistoryItem(JsonNode event, String kind, String text) {
+        return isType(event, "history_item")
+                && kind.equals(event.get("kind").asText())
+                && text.equals(event.get("text").asText());
+    }
+
+    private static boolean isHistoryItemContaining(JsonNode event, String kind, String text) {
+        return isType(event, "history_item")
+                && kind.equals(event.get("kind").asText())
+                && event.get("text").asText().contains(text);
+    }
+
+    private static boolean isFatalErrorContaining(JsonNode event, String text) {
+        return isType(event, "error")
+                && !event.get("recoverable").asBoolean()
+                && event.get("message").asText().contains(text);
     }
 
     private static void assertNoSensitiveLeak(String text) {

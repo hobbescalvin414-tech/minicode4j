@@ -18,7 +18,7 @@
   一个轻量级、本地优先、terminal-first 的 coding agent。MiniCode 的 Java 版。
 </p>
 
-[English](./README.md) | [功能对齐概览](./FEATURE_ALIGNMENT_ZH.md) | [可优化点](./IMPROVEMENTS_ZH.md)
+[English](./README.md) | [MiniCode4j 学习手册](./MiniCode4j学习手册.md) | [功能对齐概览](./FEATURE_ALIGNMENT_ZH.md) | [可优化点](./IMPROVEMENTS_ZH.md)
 
 MiniCode4j 面向本地开发工作流：读文件、搜代码、执行命令、审阅修改、保存可恢复会话，并在长上下文中通过上下文压缩保持可用。目前只支持作为一个coding agent的最小功能，很多地方都不太完善，但是能跑:)。
 

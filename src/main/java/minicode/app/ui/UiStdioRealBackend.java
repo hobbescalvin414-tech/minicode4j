@@ -16,6 +16,10 @@ import minicode.permissions.api.PermissionPromptHandler;
 import minicode.permissions.model.PermissionDecision;
 import minicode.permissions.model.PermissionPromptResult;
 import minicode.permissions.model.PermissionRequest;
+import minicode.session.plan.PersistenceAction;
+import minicode.session.plan.TurnPersistencePlan;
+import minicode.session.service.SessionService;
+import minicode.session.store.SessionStore;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -122,7 +126,12 @@ public final class UiStdioRealBackend {
                         if (services != null) {
                             services.close();
                         }
-                        session = session.fromInit(command);
+                        Session requestedSession = session.fromInit(command);
+                        if (command.hasNonNull("resumeSessionId")
+                                && !validateResumeSession(requestedSession, emitter)) {
+                            return;
+                        }
+                        session = requestedSession;
                         services = createServices(session, permissionHandler, event ->
                                 projectEvent(event, projector, askUserFlow, emitter));
                         emitter.emit(new UiEvent.Ready(session.sessionId(), session.cwd().toString(), runtimeConfig.model()));
@@ -204,6 +213,17 @@ public final class UiStdioRealBackend {
         }
     }
 
+    private static boolean validateResumeSession(Session session, Emitter emitter) {
+        try {
+            new SessionService(new SessionStore(session.home().resolve("sessions")))
+                    .requireResumable(session.cwd().toString(), session.sessionId());
+            return true;
+        } catch (IllegalArgumentException exception) {
+            emitter.emit(new UiEvent.Error(safeMessage(exception), false));
+            return false;
+        }
+    }
+
     private ApplicationServices createServices(Session session, PermissionPromptHandler permissionPromptHandler,
                                                minicode.core.event.AgentEventSink eventSink) {
         if (modelAdapterOverride != null) {
@@ -249,8 +269,13 @@ public final class UiStdioRealBackend {
     private static void runUserTurn(String text, ApplicationServices services, Session session, Emitter emitter) {
         try {
             emitter.emit(new UiEvent.Status("Thinking...", true));
+            List<ChatMessage> history = services.sessionMessages();
+            UserMessage userMessage = new UserMessage(text);
+            services.sessionPersistenceRunner().apply(new TurnPersistencePlan(
+                    List.of(new PersistenceAction.AppendMessagesAction(List.of(userMessage)))
+            ));
             AgentTurnResult result = services.runTurn(services.turnRequest(
-                    appendUserMessage(services.sessionMessages(), text),
+                    appendUserMessage(history, userMessage),
                     session.maxSteps()
             ));
             services.sessionPersistenceRunner().apply(result.persistencePlan());
@@ -287,9 +312,9 @@ public final class UiStdioRealBackend {
         };
     }
 
-    private static List<ChatMessage> appendUserMessage(List<ChatMessage> existingMessages, String text) {
+    private static List<ChatMessage> appendUserMessage(List<ChatMessage> existingMessages, UserMessage userMessage) {
         java.util.ArrayList<ChatMessage> messages = new java.util.ArrayList<>(existingMessages);
-        messages.add(new UserMessage(text));
+        messages.add(userMessage);
         return List.copyOf(messages);
     }
 
